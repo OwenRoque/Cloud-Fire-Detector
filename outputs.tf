@@ -5,7 +5,7 @@ output "iot_endpoint" {
 
 output "iot_thing_name" {
   description = "Thing Name para el teléfono (FOG)"
-  value       = aws_iot_thing.jetson.name
+  value       = aws_iot_thing.phone.name
 }
 
 output "iot_certificate_arn" {
@@ -26,8 +26,4 @@ output "sns_topic_arn" {
 output "api_endpoint" {
   description = "API Gateway endpoint (opcional)"
   value       = aws_apigatewayv2_api.api.api_endpoint
-}
-
-data "aws_iot_endpoint" "endpoint" {
-  endpoint_type = "iot:Data-ATS"
 }

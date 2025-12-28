@@ -1,5 +1,5 @@
-resource "aws_iot_thing" "jetson" {
-  name = "jetson-001"
+resource "aws_iot_thing" "phone" {
+  name = "phone-1"
 }
 
 resource "aws_iot_policy" "iot_policy" {
@@ -28,6 +28,11 @@ resource "aws_iot_policy_attachment" "policy_attach" {
 }
 
 resource "aws_iot_thing_principal_attachment" "thing_attach" {
-  thing     = aws_iot_thing.jetson.name
+  thing     = aws_iot_thing.phone.name
   principal = aws_iot_certificate.cert.arn
 }
+
+data "aws_iot_endpoint" "endpoint_address" {
+  endpoint_type = "iot:Data-ATS"
+}
+
