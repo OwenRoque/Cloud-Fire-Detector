@@ -1,0 +1,20 @@
+# ============================================================================
+# Dependencias Python para Fog Processor
+# ============================================================================
+# Instalación: pip install -r requirements.txt
+# ============================================================================
+
+# MQTT Client para comunicación local
+paho-mqtt==1.6.1
+
+# HTTP requests para comunicación con cámaras
+requests==2.31.0
+
+# AWS IoT SDK v2 (solo si se habilita AWS_IOT_ENABLED=True)
+# awsiotsdk==1.12.0  # Descomentar después de terraform apply
+
+# Logging mejorado (opcional)
+colorlog==6.8.0
+
+# JSON schema validation (opcional)
+# jsonschema==4.20.0
