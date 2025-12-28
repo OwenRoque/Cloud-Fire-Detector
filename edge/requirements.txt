@@ -1,0 +1,18 @@
+# ============================================================================
+# Dependencias Python para Edge Devices
+# ============================================================================
+
+# MQTT Client
+paho-mqtt==1.6.1
+
+# Flask (para servidor de cámara Termux)
+flask==3.0.0
+
+# OpenCV para detección de fuego
+opencv-python==4.8.1.78
+
+# NumPy (requerido por OpenCV)
+numpy==1.24.3
+
+# Pillow para manipulación de imágenes
+Pillow==10.1.0

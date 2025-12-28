@@ -21,7 +21,7 @@ resource "aws_iam_user" "jhon" {
 }
 
 resource "aws_iam_group_membership" "devs_members" {
-  name  = "devs-members"
+  name = "devs-members"
   users = [
     aws_iam_user.owen.name,
     aws_iam_user.jhon.name

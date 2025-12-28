@@ -12,8 +12,8 @@ resource "aws_lambda_function" "telegram" {
 
   environment {
     variables = {
-      TELEGRAM_BOT_TOKEN = "PUT_TOKEN_HERE"
-      TELEGRAM_CHAT_ID  = "PUT_CHAT_ID"
+      TELEGRAM_BOT_TOKEN = var.telegram_bot_token
+      TELEGRAM_CHAT_ID   = var.telegram_chat_id
     }
   }
 }

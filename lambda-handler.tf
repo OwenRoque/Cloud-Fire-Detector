@@ -13,8 +13,8 @@ resource "aws_lambda_function" "fire_handler" {
 
   environment {
     variables = {
-        SNS_TOPIC_ARN = aws_sns_topic.alerts.arn
-        TABLE_NAME   = "fire-events"
+      SNS_TOPIC_ARN = aws_sns_topic.alerts.arn
+      TABLE_NAME    = "fire-events"
     }
   }
 }
