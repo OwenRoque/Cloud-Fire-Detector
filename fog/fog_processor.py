@@ -26,6 +26,10 @@ from typing import Dict, Optional
 import sys
 import os
 
+# AWS IoT SDK v2
+from awscrt import mqtt as mqtt_connection_builder
+from awsiot import mqtt_connection_builder as iot_mqtt_builder
+
 # ============================================================================
 # CONFIGURACIÓN
 # ============================================================================
@@ -48,28 +52,35 @@ THRESHOLDS = {
 }
 
 # Mapa de proximidad: Sensor ID → IP de cámara
-# (En producción, esto se carga desde S3 o DynamoDB)
 SENSOR_CAMERA_MAP = {
-    "sensor-zona1": "192.168.1.105",      # Arduino → Celular Termux
-    "sensor-zona2": "192.168.1.105",
-    "sensor-virtual-1": "192.168.1.105",
-    "sensor-virtual-2": "192.168.1.105",
-    "sensor-virtual-3": "192.168.1.105",
-    "sensor-virtual-4": "192.168.1.105",
-    "sensor-virtual-5": "192.168.1.105",
+    "sensor-zona1": "192.168.0.41",
+    "sensor-zona2": "192.168.0.41",
+    "sensor-virtual-1": "192.168.0.41",
+    "sensor-virtual-2": "192.168.0.41",
+    "sensor-virtual-3": "192.168.0.41",
+    "sensor-virtual-4": "192.168.0.41",
+    "sensor-virtual-5": "192.168.0.41",
 }
 
-# Endpoints de cámaras (Flask en Termux)
+# Endpoints de cámaras
 CAMERA_PORT = 5000
-CAMERA_TIMEOUT = 10  # segundos
+CAMERA_TIMEOUT = 10
 
-# AWS IoT Core (solo si está disponible)
-AWS_IOT_ENABLED = False  # Cambiar a True después de terraform apply
-AWS_IOT_ENDPOINT = os.getenv("AWS_IOT_ENDPOINT", "")
+# ============================================================================
+# AWS IoT Core Configuration
+# ============================================================================
+AWS_IOT_ENABLED = True  # ✅ HABILITADO
+AWS_IOT_ENDPOINT = "a7a75jxclqem3-ats.iot.us-east-1.amazonaws.com"
 AWS_IOT_TOPIC_ALERTAS = "industria/zona1/alertas"
+AWS_IOT_CLIENT_ID = "fog-node-001"
 
-# Cooldown para evitar alertas duplicadas
-ALERT_COOLDOWN = 60  # segundos
+# Rutas a certificados
+AWS_CERT_PATH = "fog/certs/certificate.pem.crt"
+AWS_PRIVATE_KEY_PATH = "fog/certs/private.pem.key"
+AWS_ROOT_CA_PATH = "fog/certs/AmazonRootCA1.pem"
+
+# Cooldown
+ALERT_COOLDOWN = 60
 last_alert_time = {}
 
 # ============================================================================
@@ -92,27 +103,66 @@ logger = logging.getLogger("FogProcessor")
 
 class FogProcessor:
     def __init__(self):
-        self.mqtt_client = mqtt.Client(client_id="fog-node-001")
+        self.mqtt_client = mqtt.Client(client_id="fog-local-mqtt")
         self.mqtt_client.on_connect = self.on_connect
         self.mqtt_client.on_message = self.on_message
         self.mqtt_client.on_disconnect = self.on_disconnect
         
-        self.aws_client = None  # Para conexión a AWS IoT (futuro)
-        self.sensor_data_cache = {}  # Cache de últimos datos por sensor
+        self.aws_mqtt_connection = None
+        self.aws_connected = False
+        self.sensor_data_cache = {}
         
         logger.info("🌫️  Fog Processor inicializado")
-        logger.info(f"   Broker MQTT: {LOCAL_MQTT_BROKER}:{LOCAL_MQTT_PORT}")
+        logger.info(f"   Broker MQTT local: {LOCAL_MQTT_BROKER}:{LOCAL_MQTT_PORT}")
+        logger.info(f"   AWS IoT Endpoint: {AWS_IOT_ENDPOINT}")
         logger.info(f"   Umbrales: {THRESHOLDS}")
         logger.info(f"   Cámaras registradas: {len(SENSOR_CAMERA_MAP)}")
 
     # ========================================================================
-    # MQTT Callbacks
+    # AWS IoT Connection
+    # ========================================================================
+    
+    def connect_aws_iot(self):
+        """Conecta a AWS IoT Core usando certificados X.509"""
+        if not AWS_IOT_ENABLED:
+            logger.info("☁️  AWS IoT deshabilitado")
+            return
+        
+        try:
+            logger.info("☁️  Conectando a AWS IoT Core...")
+            
+            # Construir conexión MQTT con certificados
+            self.aws_mqtt_connection = iot_mqtt_builder.mtls_from_path(
+                endpoint=AWS_IOT_ENDPOINT,
+                cert_filepath=AWS_CERT_PATH,
+                pri_key_filepath=AWS_PRIVATE_KEY_PATH,
+                ca_filepath=AWS_ROOT_CA_PATH,
+                client_id=AWS_IOT_CLIENT_ID,
+                clean_session=False,
+                keep_alive_secs=30
+            )
+            
+            # Conectar
+            connect_future = self.aws_mqtt_connection.connect()
+            connect_future.result()
+            
+            self.aws_connected = True
+            logger.info("✅ Conectado a AWS IoT Core exitosamente")
+            logger.info(f"   Client ID: {AWS_IOT_CLIENT_ID}")
+            logger.info(f"   Endpoint: {AWS_IOT_ENDPOINT}")
+            
+        except Exception as e:
+            logger.error(f"❌ Error al conectar a AWS IoT: {e}")
+            logger.info("💾 Continuando en modo local (ISLA)")
+            self.aws_connected = False
+
+    # ========================================================================
+    # MQTT Local Callbacks
     # ========================================================================
     
     def on_connect(self, client, userdata, flags, rc):
         if rc == 0:
             logger.info("✅ Conectado al broker MQTT local")
-            # Suscribirse a todos los sensores
             client.subscribe(TOPIC_SENSORES)
             logger.info(f"📡 Suscrito a: {TOPIC_SENSORES}")
         else:
@@ -126,11 +176,9 @@ class FogProcessor:
     def on_message(self, client, userdata, msg):
         """Procesa mensajes de sensores locales"""
         try:
-            # Decodificar mensaje
             payload = json.loads(msg.payload.decode())
             topic_parts = msg.topic.split("/")
             
-            # Extraer zona y tipo de sensor
             zona = topic_parts[1] if len(topic_parts) > 1 else "unknown"
             sensor_id = payload.get("device_id", f"sensor-{zona}")
             
@@ -138,14 +186,12 @@ class FogProcessor:
             logger.debug(f"   Topic: {msg.topic}")
             logger.debug(f"   Payload: {payload}")
             
-            # Guardar en cache
             self.sensor_data_cache[sensor_id] = {
                 "data": payload,
                 "timestamp": time.time(),
                 "zona": zona
             }
             
-            # Analizar si hay riesgo de incendio
             self.analyze_fire_risk(sensor_id, payload, zona)
             
         except json.JSONDecodeError:
@@ -164,28 +210,23 @@ class FogProcessor:
         luz = data.get("luz", 0)
         humedad = data.get("humedad", 100)
         
-        # Criterios de alerta
         temp_critical = temperatura > THRESHOLDS["temperatura"]
         luz_critical = luz > THRESHOLDS["luz"]
         humedad_critical = humedad < THRESHOLDS["humedad"]
         
-        # Mostrar estado
         logger.info(f"   🌡️  Temp: {temperatura}°C {'🔥' if temp_critical else '✅'}")
         logger.info(f"   💡 Luz: {luz} {'🔥' if luz_critical else '✅'}")
         logger.info(f"   💧 Humedad: {humedad}% {'⚠️' if humedad_critical else '✅'}")
         
-        # Condición de alerta: Temperatura alta Y/O Luz alta
         if temp_critical or luz_critical:
             logger.warning(f"🚨 ALERTA: Posible incendio detectado en {zona}")
             logger.warning(f"   Sensor: {sensor_id}")
             logger.warning(f"   Temp: {temperatura}°C, Luz: {luz}")
             
-            # Verificar cooldown
             if self.is_in_cooldown(sensor_id):
                 logger.info(f"   ⏳ En cooldown, ignorando alerta duplicada")
                 return
             
-            # Solicitar confirmación visual
             self.request_visual_confirmation(sensor_id, zona, data)
     
     def is_in_cooldown(self, sensor_id: str) -> bool:
@@ -202,23 +243,18 @@ class FogProcessor:
     def request_visual_confirmation(self, sensor_id: str, zona: str, sensor_data: Dict):
         """Solicita confirmación visual a la cámara más cercana"""
         
-        # Obtener IP de cámara asignada
         camera_ip = SENSOR_CAMERA_MAP.get(sensor_id)
         
         if not camera_ip:
             logger.warning(f"⚠️  No hay cámara asignada para {sensor_id}")
-            logger.warning(f"   Mapa disponible: {list(SENSOR_CAMERA_MAP.keys())}")
-            # Activar respuesta local sin confirmación
             self.activate_local_response(sensor_id, zona, sensor_data, confirmed=False)
             return
         
         logger.info(f"📸 Solicitando confirmación visual a cámara: {camera_ip}")
         
         try:
-            # Endpoint del servidor Flask en Termux
             url = f"http://{camera_ip}:{CAMERA_PORT}/capturar"
             
-            # Enviar solicitud con datos del sensor
             response = requests.post(
                 url,
                 json={
@@ -245,7 +281,6 @@ class FogProcessor:
                     logger.info(f"✅ Falsa alarma: No se detectó fuego en la imagen")
             else:
                 logger.error(f"❌ Error de cámara: HTTP {response.status_code}")
-                # Activar respuesta local sin confirmación (por seguridad)
                 self.activate_local_response(sensor_id, zona, sensor_data, confirmed=False)
                 
         except requests.exceptions.Timeout:
@@ -263,7 +298,7 @@ class FogProcessor:
     # ========================================================================
     
     def activate_local_response(self, sensor_id: str, zona: str, data: Dict, confirmed: bool, confidence: float = 0.0):
-        """Activa respuesta local de emergencia (funciona sin internet)"""
+        """Activa respuesta local de emergencia"""
         
         logger.critical("=" * 70)
         logger.critical("🚨 ACTIVANDO SISTEMA DE EXTINCIÓN LOCAL 🚨")
@@ -273,17 +308,14 @@ class FogProcessor:
         logger.critical(f"   Confianza: {confidence:.1%}" if confirmed else "")
         logger.critical("=" * 70)
         
-        # Simulación de acciones locales
         print("\n🔴 ALERTA DE INCENDIO - RESPUESTA AUTOMÁTICA 🔴")
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Cerrando válvulas de gas en zona {zona}")
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Activando sistema de nitrógeno")
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Enviando alerta a control local")
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Activando sirenas de evacuación\n")
         
-        # Actualizar cooldown
         last_alert_time[sensor_id] = time.time()
         
-        # Publicar en topic local para otros sistemas
         alert_msg = {
             "event": "fire_detected",
             "zona": zona,
@@ -308,15 +340,14 @@ class FogProcessor:
     # ========================================================================
     
     def publish_to_cloud(self, sensor_id: str, zona: str, data: Dict, confidence: float):
-        """Publica alerta confirmada a AWS IoT Core (si hay conectividad)"""
+        """Publica alerta confirmada a AWS IoT Core"""
         
-        if not AWS_IOT_ENABLED:
-            logger.info("☁️  AWS IoT Core deshabilitado (modo local)")
+        if not AWS_IOT_ENABLED or not self.aws_connected:
+            logger.info("☁️  AWS IoT no disponible (modo local)")
             return
         
         logger.info("☁️  Publicando alerta a AWS IoT Core...")
         
-        # Payload para la nube
         cloud_payload = {
             "device_id": sensor_id,
             "zona": zona,
@@ -330,13 +361,20 @@ class FogProcessor:
         }
         
         try:
-            # TODO: Implementar AWS IoT SDK v2
-            # self.aws_client.publish(AWS_IOT_TOPIC_ALERTAS, json.dumps(cloud_payload))
-            logger.info(f"✅ Alerta enviada a AWS (simulado)")
+            # Publicar a AWS IoT Core
+            self.aws_mqtt_connection.publish(
+                topic=AWS_IOT_TOPIC_ALERTAS,
+                payload=json.dumps(cloud_payload),
+                qos=mqtt_connection_builder.QoS.AT_LEAST_ONCE
+            )
+            
+            logger.info(f"✅ Alerta enviada a AWS IoT Core")
+            logger.info(f"   Topic: {AWS_IOT_TOPIC_ALERTAS}")
             logger.debug(f"   Payload: {cloud_payload}")
+            
         except Exception as e:
             logger.error(f"❌ Error al publicar a AWS: {e}")
-            logger.info("💾 Guardando en cola local para reintento...")
+            logger.info("💾 Alerta guardada localmente")
 
     # ========================================================================
     # MAIN LOOP
@@ -347,18 +385,19 @@ class FogProcessor:
         logger.info("🚀 Iniciando Fog Processor...")
         
         try:
+            # Conectar a AWS IoT
+            self.connect_aws_iot()
+            
             # Conectar a MQTT local
             self.mqtt_client.connect(LOCAL_MQTT_BROKER, LOCAL_MQTT_PORT, LOCAL_MQTT_KEEPALIVE)
-            logger.info("🔌 Conectado al broker MQTT")
+            logger.info("🔌 Conectado al broker MQTT local")
             
-            # Loop infinito (non-blocking)
             self.mqtt_client.loop_start()
             
             logger.info("✅ Fog Processor en ejecución")
             logger.info("   Esperando datos de sensores...")
             logger.info("   Presiona Ctrl+C para detener")
             
-            # Mantener el programa corriendo
             while True:
                 time.sleep(1)
                 
@@ -366,6 +405,11 @@ class FogProcessor:
             logger.info("\n⚠️  Deteniendo Fog Processor...")
             self.mqtt_client.loop_stop()
             self.mqtt_client.disconnect()
+            
+            if self.aws_mqtt_connection:
+                disconnect_future = self.aws_mqtt_connection.disconnect()
+                disconnect_future.result()
+            
             logger.info("👋 Fog Processor detenido")
         except Exception as e:
             logger.critical(f"💥 Error crítico: {e}", exc_info=True)

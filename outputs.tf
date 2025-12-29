@@ -1,6 +1,10 @@
 # ============================================================================
 # Outputs - AWS IoT Core
 # ============================================================================
+data "aws_iot_endpoint" "endpoint" {
+  endpoint_type = "iot:Data-ATS"
+}
+
 output "iot_endpoint" {
   description = "Endpoint AWS IoT Core (MQTT over TLS)"
   value       = data.aws_iot_endpoint.endpoint.endpoint_address
@@ -37,20 +41,20 @@ output "iot_public_key" {
 # ============================================================================
 # Outputs - Greengrass
 # ============================================================================
-output "greengrass_role_alias" {
-  description = "Role Alias para Greengrass Core"
-  value       = aws_iot_role_alias.greengrass_alias.alias
-}
+# output "greengrass_role_alias" {
+#   description = "Role Alias para Greengrass Core"
+#   value       = aws_iot_role_alias.greengrass_alias.alias
+# }
 
-output "greengrass_artifacts_bucket" {
-  description = "Bucket S3 para artefactos de Greengrass"
-  value       = aws_s3_bucket.greengrass_artifacts.bucket
-}
+# output "greengrass_artifacts_bucket" {
+#   description = "Bucket S3 para artefactos de Greengrass"
+#   value       = aws_s3_bucket.greengrass_artifacts.bucket
+# }
 
-output "greengrass_config_s3_uri" {
-  description = "URI de S3 con la configuración del Fog Processor"
-  value       = "s3://${aws_s3_bucket.greengrass_artifacts.bucket}/${aws_s3_object.fog_config.key}"
-}
+# output "greengrass_config_s3_uri" {
+#   description = "URI de S3 con la configuración del Fog Processor"
+#   value       = "s3://${aws_s3_bucket.greengrass_artifacts.bucket}/${aws_s3_object.fog_config.key}"
+# }
 
 # ============================================================================
 # Outputs - Storage y Notificaciones

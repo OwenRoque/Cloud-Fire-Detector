@@ -1,0 +1,20 @@
+{
+  "sensorCameraMap": {
+    "sensor-zona1": "192.168.1.105",
+    "sensor-zona2": "192.168.1.105",
+    "sensor-virtual-1": "192.168.1.105",
+    "sensor-virtual-2": "192.168.1.105",
+    "sensor-virtual-3": "192.168.1.105",
+    "sensor-virtual-4": "192.168.1.105",
+    "sensor-virtual-5": "192.168.1.105"
+  },
+  "thresholds": {
+    "temperature": 60.0,
+    "light": 800.0,
+    "humidity": 30.0
+  },
+  "local_mqtt_broker": "localhost",
+  "local_mqtt_port": 1883,
+  "iot_endpoint": "",
+  "aws_region": "us-east-1"
+}
