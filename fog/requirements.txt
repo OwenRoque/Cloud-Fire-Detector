@@ -11,7 +11,10 @@ paho-mqtt==1.6.1
 requests==2.31.0
 
 # AWS IoT SDK v2 (solo si se habilita AWS_IOT_ENABLED=True)
-# awsiotsdk==1.12.0  # Descomentar después de terraform apply
+awsiotsdk==1.20.0  # Versión compatible con OpenSSL 3.x
+
+# AWS SDK para subir imágenes a S3
+boto3==1.42.17
 
 # Logging mejorado (opcional)
 colorlog==6.8.0

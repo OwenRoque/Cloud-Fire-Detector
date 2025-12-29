@@ -26,13 +26,13 @@
 // ============================================================================
 // CONFIGURACIÓN WiFi - MODIFICA ESTOS VALORES
 // ============================================================================
-const char* ssid = "TU_WIFI_SSID";           // Nombre de tu red WiFi
-const char* password = "TU_WIFI_PASSWORD";   // Contraseña de tu WiFi
+const char* ssid = "wifi-CsComputacion";           // Nombre de tu red WiFi
+const char* password = "EPCC2022$";   // Contraseña de tu WiFi
 
 // ============================================================================
 // CONFIGURACIÓN MQTT - FOG NODE (Laptop B)
 // ============================================================================
-const char* mqtt_broker = "192.168.1.100";  // ⚠️ CAMBIAR A IP DE LAPTOP B
+const char* mqtt_broker = "10.7.134.80";  // ⚠️ CAMBIAR A IP DE LAPTOP B
 const int mqtt_port = 1883;
 const char* mqtt_client_id = "arduino-zona1";  // ID único del cliente
 

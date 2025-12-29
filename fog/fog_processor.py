@@ -7,7 +7,7 @@ if __name__ == "__main__":
     logger = setup_logger()
 
     print("=" * 70)
-    print("🌫️  FOG PROCESSOR - Fire Detection System")
+    print("  FOG PROCESSOR - Fire Detection System")
     print("=" * 70)
 
     processor = FogProcessor(logger)

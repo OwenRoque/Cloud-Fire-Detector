@@ -1,12 +1,6 @@
 {
   "sensorCameraMap": {
-    "sensor-zona1": "192.168.1.105",
-    "sensor-zona2": "192.168.1.105",
-    "sensor-virtual-1": "192.168.1.105",
-    "sensor-virtual-2": "192.168.1.105",
-    "sensor-virtual-3": "192.168.1.105",
-    "sensor-virtual-4": "192.168.1.105",
-    "sensor-virtual-5": "192.168.1.105"
+    "sensor-zona1": "192.168.1.105"
   },
   "thresholds": {
     "temperature": 60.0,

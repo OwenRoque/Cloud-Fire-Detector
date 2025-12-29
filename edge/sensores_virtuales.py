@@ -97,14 +97,14 @@ class SensorVirtual:
             self.fire_mode = True
             self.fire_start_time = time.time()
             self.fire_duration = random.uniform(15, 45)  # 15-45 segundos
-            print(f"🔥 [{self.device_id}] SIMULANDO INCENDIO por {self.fire_duration:.0f}s")
+            print(f" [{self.device_id}] SIMULANDO INCENDIO por {self.fire_duration:.0f}s")
         
         # Verificar si salimos de modo incendio
         if self.fire_mode:
             elapsed = time.time() - self.fire_start_time
             if elapsed > self.fire_duration:
                 self.fire_mode = False
-                print(f"✅ [{self.device_id}] Incendio controlado, volviendo a normal")
+                print(f" [{self.device_id}] Incendio controlado, volviendo a normal")
         
         # Generar valores según modo
         if self.fire_mode:
@@ -140,7 +140,7 @@ class SensorVirtual:
     def send_data(self):
         """Envía datos al Fog Node vía MQTT"""
         if not self.mqtt_client:
-            print(f"⚠️  [{self.device_id}] Cliente MQTT no conectado")
+            print(f"  [{self.device_id}] Cliente MQTT no conectado")
             return
         
         data = self.generate_data()
@@ -150,12 +150,12 @@ class SensorVirtual:
             self.mqtt_client.publish(self.mqtt_topic, payload, qos=0)
             
             # Log con indicador visual
-            status_icon = "🔥" if self.fire_mode else "✅"
+            status_icon = "" if self.fire_mode else ""
             print(f"{status_icon} [{self.device_id}] T:{data['temperatura']}°C "
                   f"L:{data['luz']:.0f} H:{data['humedad']}% → {self.mqtt_topic}")
             
         except Exception as e:
-            print(f"❌ [{self.device_id}] Error al enviar: {e}")
+            print(f" [{self.device_id}] Error al enviar: {e}")
 
 # ============================================================================
 # GESTOR DE SENSORES
@@ -174,37 +174,37 @@ class SensorManager:
             sensor.connect_mqtt(self.mqtt_client)
             self.sensores.append(sensor)
         
-        print(f"📡 Creados {len(self.sensores)} sensores virtuales")
+        print(f" Creados {len(self.sensores)} sensores virtuales")
     
     def on_connect(self, client, userdata, flags, rc):
         if rc == 0:
-            print("✅ Conectado al Fog Node MQTT")
+            print(" Conectado al Fog Node MQTT")
             # Publicar estado de inicio
             for sensor in self.sensores:
                 status_topic = f"industria/{sensor.zona}/status"
                 client.publish(status_topic, 
                               f"Sensor virtual {sensor.device_id} iniciado")
         else:
-            print(f"❌ Error de conexión MQTT: {rc}")
+            print(f" Error de conexión MQTT: {rc}")
     
     def on_disconnect(self, client, userdata, rc):
         if rc != 0:
-            print(f"⚠️  Desconexión inesperada (rc={rc}). Reconectando...")
+            print(f"  Desconexión inesperada (rc={rc}). Reconectando...")
     
     def start(self):
         """Inicia el envío de datos de todos los sensores"""
-        print(f"🚀 Conectando a Fog Node: {MQTT_BROKER}:{MQTT_PORT}")
+        print(f" Conectando a Fog Node: {MQTT_BROKER}:{MQTT_PORT}")
         
         try:
             self.mqtt_client.connect(MQTT_BROKER, MQTT_PORT, MQTT_KEEPALIVE)
             self.mqtt_client.loop_start()
             
-            print(f"✅ Sistema iniciado")
+            print(f" Sistema iniciado")
             print(f"   Intervalo de envío: {SEND_INTERVAL}s")
             print(f"   Probabilidad de incendio: {FIRE_PROBABILITY*100:.1f}%")
             print(f"   Topics base: industria/zona*/sensor/*")
             print()
-            print("📊 Enviando datos... (Ctrl+C para detener)")
+            print(" Enviando datos... (Ctrl+C para detener)")
             print("─" * 80)
             
             while True:
@@ -216,7 +216,7 @@ class SensorManager:
                 time.sleep(SEND_INTERVAL)
                 
         except KeyboardInterrupt:
-            print("\n⚠️  Deteniendo sensores virtuales...")
+            print("\n  Deteniendo sensores virtuales...")
             self.mqtt_client.loop_stop()
             self.mqtt_client.disconnect()
             print("👋 Sensores virtuales detenidos")
@@ -230,7 +230,7 @@ class SensorManager:
 
 if __name__ == "__main__":
     print("=" * 80)
-    print("📡 SENSORES VIRTUALES - Fire Detection System")
+    print(" SENSORES VIRTUALES - Fire Detection System")
     print("   Universidad Nacional de San Agustín - Arequipa, Perú")
     print("=" * 80)
     print()

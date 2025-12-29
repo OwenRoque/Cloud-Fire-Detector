@@ -18,11 +18,11 @@ THRESHOLDS = {
 SENSOR_CAMERA_MAP = {
     "sensor-zona1": "10.7.135.194",
     "sensor-zona2": "10.7.135.194",
-    "sensor-virtual-1": "10.7.135.194",
-    "sensor-virtual-2": "10.7.135.194",
-    "sensor-virtual-3": "10.7.135.194",
-    "sensor-virtual-4": "10.7.135.194",
-    "sensor-virtual-5": "10.7.135.194",
+    "sensor-virtual-1": "10.7.135.190",
+    "sensor-virtual-2": "10.7.135.190",
+    "sensor-virtual-3": "10.7.135.190",
+    "sensor-virtual-4": "10.7.135.190",
+    "sensor-virtual-5": "10.7.135.190",
 }
 
 CAMERA_PORT = 5000
@@ -34,8 +34,11 @@ AWS_IOT_ENDPOINT = "a7a75jxclqem3-ats.iot.us-east-1.amazonaws.com"
 AWS_IOT_TOPIC_ALERTAS = "industria/zona1/alertas"
 AWS_IOT_CLIENT_ID = "fog-node-001"
 
-AWS_CERT_PATH = "fog/certs/certificate.pem.crt"
-AWS_PRIVATE_KEY_PATH = "fog/certs/private.pem.key"
-AWS_ROOT_CA_PATH = "fog/certs/AmazonRootCA1.pem"
+# Usar paths absolutos para evitar problemas de directorio
+import os
+_BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+AWS_CERT_PATH = os.path.join(_BASE_DIR, "certs", "certificate.pem.crt")
+AWS_PRIVATE_KEY_PATH = os.path.join(_BASE_DIR, "certs", "private.pem.key")
+AWS_ROOT_CA_PATH = os.path.join(_BASE_DIR, "certs", "AmazonRootCA1.pem")
 
 ALERT_COOLDOWN = 60

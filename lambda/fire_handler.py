@@ -21,7 +21,7 @@ def convert_floats(obj):
     return obj
 
 def lambda_handler(event, context):
-    print("🔥 Evento recibido:", json.dumps(event, default=str))
+    print(" Evento recibido:", json.dumps(event, default=str))
 
     try:
         # Detectar origen (IoT o API Gateway)
@@ -66,11 +66,11 @@ def lambda_handler(event, context):
         # Guardar en DynamoDB
         table = dynamodb.Table(TABLE_NAME)
         table.put_item(Item=item)
-        print(f"✅ Evento guardado en DynamoDB: {item['event_id']}")
+        print(f" Evento guardado en DynamoDB: {item['event_id']}")
 
         # Publicar alerta a SNS
         message = {
-            "alert": "🔥 INCENDIO DETECTADO",
+            "alert": " INCENDIO DETECTADO",
             "device": payload["device_id"],
             "zona": payload.get("zona", "unknown"),
             "confidence": float(payload["confidence"]),  # SNS puede recibir float
@@ -84,7 +84,7 @@ def lambda_handler(event, context):
             Message=json.dumps(message, indent=2, default=str),
             Subject="🚨 Fire Alert - Incendio Detectado"
         )
-        print(f"✅ Alerta publicada a SNS: {SNS_TOPIC_ARN}")
+        print(f" Alerta publicada a SNS: {SNS_TOPIC_ARN}")
 
         return {
             "statusCode": 200,
@@ -96,7 +96,7 @@ def lambda_handler(event, context):
         }
 
     except Exception as e:
-        print(f"❌ Error procesando evento: {str(e)}")
+        print(f" Error procesando evento: {str(e)}")
         print(f"   Payload: {json.dumps(payload, default=str)}")
         return {
             "statusCode": 500,

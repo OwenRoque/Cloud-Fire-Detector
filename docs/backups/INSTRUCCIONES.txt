@@ -1,0 +1,160 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║                  🔥 CLOUD FIRE DETECTOR 🔥                           ║
+║              Instrucciones de Instalación y Ejecución               ║
+║                                                                      ║
+║  Universidad Nacional de San Agustín - Arequipa, Perú              ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+📋 PASO 1: INSTALAR DEPENDENCIAS DEL SISTEMA
+════════════════════════════════════════════════════════════════════════
+
+Ejecutar (requiere sudo):
+
+    chmod +x setup_system.sh setup_python.sh start_project.sh
+    sudo ./setup_system.sh
+
+✅ Esto instalará y configurará Mosquitto MQTT Broker
+
+
+📋 PASO 2: CONFIGURAR PYTHON
+════════════════════════════════════════════════════════════════════════
+
+Ejecutar (NO requiere sudo):
+
+    ./setup_python.sh
+
+✅ Esto creará el entorno virtual e instalará todas las dependencias Python
+
+
+📋 PASO 3: EJECUTAR EL PROYECTO
+════════════════════════════════════════════════════════════════════════
+
+OPCIÓN A - Automático (Recomendado):
+
+    ./start_project.sh
+    
+    Luego seleccionar opción 3 (Iniciar ambos componentes)
+
+
+OPCIÓN B - Manual (2 terminales):
+
+    Terminal 1:
+    └─> source .venv/bin/activate
+    └─> python3 edge/sensores_virtuales.py
+
+    Terminal 2 (esperar 5-10 segundos):
+    └─> source .venv/bin/activate
+    └─> python3 fog/fog_processor.py
+
+
+📋 VERIFICACIÓN
+════════════════════════════════════════════════════════════════════════
+
+Verificar Mosquitto:
+    sudo systemctl status mosquitto
+
+Monitorear MQTT (terminal adicional):
+    mosquitto_sub -h localhost -t '#' -v
+
+Verificar estado completo:
+    ./start_project.sh
+    └─> Seleccionar opción 4
+
+
+📋 SALIDA ESPERADA
+════════════════════════════════════════════════════════════════════════
+
+Terminal Sensores:
+    📡 Iniciando sensores virtuales...
+    ✅ Conectado al broker MQTT
+    📤 [sensor-virtual-1] Enviando datos...
+
+Terminal Fog Processor:
+    🌫️  FOG PROCESSOR - Fire Detection System
+    ✅ Conectado al broker MQTT local
+    📡 Suscrito a industria/+/sensor/#
+    📥 Datos recibidos de sensor-virtual-1 (zona zona2)
+       🌡️ 25.3°C ✅
+       💡 350 ✅
+       💧 55% ✅
+
+
+📋 NOTAS IMPORTANTES
+════════════════════════════════════════════════════════════════════════
+
+⚠️  MODO DE OPERACIÓN:
+
+    🏝️  SIN Certificados AWS IoT:
+        - Sistema funciona en MODO LOCAL
+        - Sensores → Fog Processor → Respuesta local
+        - NO se envía a AWS IoT
+        - NO hay notificaciones a Telegram
+
+    ☁️  CON Certificados AWS IoT:
+        - Sistema funciona en MODO CLOUD
+        - Sensores → Fog → AWS IoT → Lambda → DynamoDB → SNS → Telegram
+        - Para habilitar: ejecutar 'terraform apply' primero
+
+
+⚠️  ORDEN DE EJECUCIÓN:
+
+    1️⃣  Mosquitto (debe estar corriendo)
+    2️⃣  Sensores Virtuales
+    3️⃣  Fog Processor (después de 5-10 segundos)
+
+
+⚠️  DETENER EL SISTEMA:
+
+    Presionar Ctrl+C en cada terminal
+
+
+📋 COMANDOS ÚTILES
+════════════════════════════════════════════════════════════════════════
+
+Mosquitto:
+    sudo systemctl start mosquitto      # Iniciar
+    sudo systemctl stop mosquitto       # Detener
+    sudo systemctl restart mosquitto    # Reiniciar
+    sudo systemctl status mosquitto     # Ver estado
+
+Python:
+    source .venv/bin/activate           # Activar entorno
+    deactivate                          # Desactivar entorno
+    pip list                            # Ver paquetes
+
+Monitoreo:
+    mosquitto_sub -h localhost -t '#' -v    # Ver mensajes MQTT
+    sudo journalctl -u mosquitto -f         # Ver logs Mosquitto
+
+
+📋 TROUBLESHOOTING
+════════════════════════════════════════════════════════════════════════
+
+❌ "Mosquitto no está corriendo"
+    └─> sudo systemctl start mosquitto
+
+❌ "Entorno virtual no encontrado"
+    └─> ./setup_python.sh
+
+❌ "ModuleNotFoundError: No module named 'paho'"
+    └─> source .venv/bin/activate
+    └─> cd fog && pip install -r requirements.txt
+
+❌ Fog no recibe mensajes
+    └─> Verificar Mosquitto: sudo systemctl status mosquitto
+    └─> Verificar sensores: mosquitto_sub -h localhost -t '#' -v
+
+
+📋 DOCUMENTACIÓN COMPLETA
+════════════════════════════════════════════════════════════════════════
+
+Para más detalles, ver:
+
+    📄 GUIA_RAPIDA.md      - Guía completa paso a paso
+    📄 README.md           - Documentación del proyecto
+    📄 fog/README.md       - Documentación del Fog Layer
+
+
+════════════════════════════════════════════════════════════════════════
+                         ¡Todo listo! 🚀
+════════════════════════════════════════════════════════════════════════

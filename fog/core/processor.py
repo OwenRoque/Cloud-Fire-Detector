@@ -14,6 +14,7 @@ from config.settings import (
 from core.detection import analyze
 from core.cooldown import is_in_cooldown
 from camera.visual_confirmation import request_confirmation
+from camera.image_manager import ImageManager
 from response.local_response import activate
 from cloud.aws_iot import AWSIoTClient
 from datetime import datetime
@@ -41,11 +42,14 @@ class FogProcessor:
 
         # Cloud
         self.aws_client = AWSIoTClient(logger)
+        
+        # Image Manager
+        self.image_manager = ImageManager(logger)
 
         # Cache de sensores
         self.sensor_cache: Dict[str, Dict] = {}
 
-        self.logger.info("🌫️ Fog Processor inicializado")
+        self.logger.info(" Fog Processor inicializado")
         self.logger.info(f"   MQTT local: {LOCAL_MQTT_BROKER}:{LOCAL_MQTT_PORT}")
 
     # ======================================================================
@@ -54,15 +58,15 @@ class FogProcessor:
 
     def _on_connect(self, client, userdata, flags, rc):
         if rc == 0:
-            self.logger.info("✅ Conectado al broker MQTT local")
+            self.logger.info(" Conectado al broker MQTT local")
             client.subscribe(TOPIC_SENSORES)
-            self.logger.info(f"📡 Suscrito a {TOPIC_SENSORES}")
+            self.logger.info(f" Suscrito a {TOPIC_SENSORES}")
         else:
-            self.logger.error(f"❌ Error de conexión MQTT (rc={rc})")
+            self.logger.error(f" Error de conexión MQTT (rc={rc})")
 
     def _on_disconnect(self, client, userdata, rc):
         if rc != 0:
-            self.logger.warning("⚠️ Desconexión inesperada del broker MQTT")
+            self.logger.warning(" Desconexión inesperada del broker MQTT")
 
     def _on_message(self, client, userdata, msg):
         try:
@@ -72,7 +76,7 @@ class FogProcessor:
             zona = topic_parts[1] if len(topic_parts) > 1 else "unknown"
             sensor_id = payload.get("device_id", f"sensor-{zona}")
 
-            self.logger.info(f"📥 Datos recibidos de {sensor_id} (zona {zona})")
+            self.logger.info(f" Datos recibidos de {sensor_id} (zona {zona})")
 
             self.sensor_cache[sensor_id] = {
                 "data": payload,
@@ -83,9 +87,9 @@ class FogProcessor:
             self._process_sensor_data(sensor_id, zona, payload)
 
         except json.JSONDecodeError:
-            self.logger.error(f"❌ JSON inválido en topic {msg.topic}")
+            self.logger.error(f" JSON inválido en topic {msg.topic}")
         except Exception as e:
-            self.logger.error(f"❌ Error procesando mensaje: {e}", exc_info=True)
+            self.logger.error(f" Error procesando mensaje: {e}", exc_info=True)
 
     # ======================================================================
     # LÓGICA PRINCIPAL
@@ -95,23 +99,23 @@ class FogProcessor:
         analysis = analyze(data)
 
         self.logger.info(
-            f"   🌡️ {analysis['temperatura']}°C "
-            f"{'🔥' if analysis['temp_critical'] else '✅'}"
+            f"    {analysis['temperatura']}°C "
+            f"{'' if analysis['temp_critical'] else ''}"
         )
         self.logger.info(
-            f"   💡 {analysis['luz']} "
-            f"{'🔥' if analysis['luz_critical'] else '✅'}"
+            f"    {analysis['luz']} "
+            f"{'' if analysis['luz_critical'] else ''}"
         )
         self.logger.info(
-            f"   💧 {analysis['humedad']}% "
-            f"{'⚠️' if analysis['humedad_critical'] else '✅'}"
+            f"    {analysis['humedad']}% "
+            f"{'' if analysis['humedad_critical'] else ''}"
         )
 
         if analysis["temp_critical"] or analysis["luz_critical"]:
             self.logger.warning(f"🚨 Riesgo de incendio en zona {zona}")
 
             if is_in_cooldown(sensor_id):
-                self.logger.info("⏳ Sensor en cooldown, alerta ignorada")
+                self.logger.info(" Sensor en cooldown, alerta ignorada")
                 return
 
             self._handle_fire_alert(sensor_id, zona, data)
@@ -122,9 +126,17 @@ class FogProcessor:
 
             confirmed = result.get("fire_detected", False)
             confidence = result.get("confidence", 0.0)
+            image_data = result.get("image_data")
 
             if confirmed:
-                self.logger.critical(f"🔥 INCENDIO CONFIRMADO en {zona}")
+                self.logger.critical(f" INCENDIO CONFIRMADO en {zona}")
+                
+                # Subir imagen a S3 si está disponible
+                s3_info = None
+                if image_data:
+                    self.logger.info(" Recibiendo imagen de la cámara...")
+                    s3_info = self.image_manager.upload_to_s3(image_data, sensor_id, zona)
+                
                 activate(
                     self.mqtt_client,
                     self.logger,
@@ -146,14 +158,20 @@ class FogProcessor:
                     "humedad": data.get("humedad"),
                     "timestamp": datetime.utcnow().isoformat()
                 }
+                
+                # Agregar información de S3 si existe
+                if s3_info:
+                    cloud_payload["image_s3_key"] = s3_info["s3_key"]
+                    cloud_payload["image_url"] = s3_info["s3_url"]
+                    self.logger.info(f" URL de imagen: {s3_info['s3_url']}")
 
                 self.aws_client.publish_alert(cloud_payload)
 
             else:
-                self.logger.info("✅ Falsa alarma según cámara")
+                self.logger.info(" Falsa alarma según cámara")
 
         except Exception as e:
-            self.logger.error(f"❌ Error en confirmación visual: {e}")
+            self.logger.error(f" Error en confirmación visual: {e}")
             activate(
                 self.mqtt_client,
                 self.logger,
@@ -168,7 +186,7 @@ class FogProcessor:
     # ======================================================================
 
     def start(self):
-        self.logger.info("🚀 Iniciando Fog Processor")
+        self.logger.info(" Iniciando Fog Processor")
 
         try:
             # Cloud
@@ -182,13 +200,13 @@ class FogProcessor:
             )
             self.mqtt_client.loop_start()
 
-            self.logger.info("✅ Fog Processor en ejecución")
+            self.logger.info(" Fog Processor en ejecución")
 
             while True:
                 time.sleep(1)
 
         except KeyboardInterrupt:
-            self.logger.info("🛑 Deteniendo Fog Processor")
+            self.logger.info(" Deteniendo Fog Processor")
             self.mqtt_client.loop_stop()
             self.mqtt_client.disconnect()
 
